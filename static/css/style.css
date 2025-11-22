@@ -1,0 +1,7 @@
+body {
+  font-family: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+}
+
+.stat-card {
+  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+}
