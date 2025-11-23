@@ -1,191 +1,275 @@
-<!-- templates/index.html -->
 <!DOCTYPE html>
 <html lang="id">
 <head>
   <meta charset="UTF-8">
-  <title>Goldfish Vision Lab | YOLOv8 Pose Analytics</title>
+  <title>Goldfish Pose Analyzer</title>
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <!-- Bootstrap -->
+
+  <!-- Bootstrap 5 -->
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-  <!-- Icons -->
+
+  <!-- Font Awesome -->
   <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" rel="stylesheet">
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
-<body class="bg-body-tertiary">
-<div class="container-fluid">
-  <div class="row min-vh-100">
+<body>
 
-    <!-- Sidebar -->
-    <aside class="col-md-3 col-lg-2 bg-primary text-white d-flex flex-column p-4 shadow-sm">
-      <div class="d-flex align-items-center mb-4">
-        <div class="rounded-circle bg-white text-primary d-flex align-items-center justify-content-center me-2" style="width:40px;height:40px;">
+<div class="page-wrapper">
+  <!-- Header -->
+  <header class="topbar shadow-sm">
+    <div class="container-fluid d-flex align-items-center justify-content-between">
+      <div class="d-flex align-items-center gap-2">
+        <div class="brand-logo">
           <i class="fa-solid fa-fish-fins"></i>
         </div>
         <div>
-          <h5 class="mb-0 fw-bold">Goldfish Vision Lab</h5>
-          <small class="text-light">YOLOv8 Pose Analytics</small>
+          <h1 class="brand-title mb-0">Goldfish Pose Analyzer</h1>
+          <p class="brand-subtitle mb-0">YOLOv8-Pose · Analisis panjang dan jumlah ikan</p>
         </div>
       </div>
-
-      <nav class="nav flex-column small">
-        <span class="text-uppercase text-light fw-semibold mb-2">Menu</span>
-        <a class="nav-link text-white-50" href="#"><i class="fa-solid fa-video me-2"></i>Analisis Video</a>
-        <a class="nav-link text-white-50" href="#"><i class="fa-solid fa-chart-line me-2"></i>Statistik</a>
-        <a class="nav-link text-white-50" href="#"><i class="fa-solid fa-gear me-2"></i>Konfigurasi</a>
-      </nav>
-
-      <div class="mt-auto small text-white-50">
-        <hr class="border-light border-opacity-25">
-        <div><i class="fa-regular fa-circle-dot me-1 text-success"></i> Status: <span class="text-success">Model siap</span></div>
-        <div><i class="fa-solid fa-microchip me-1"></i> Engine: YOLOv8 Pose</div>
+      <div class="topbar-right d-none d-md-flex align-items-center gap-3">
+        <span class="badge bg-success-subtle text-success border border-success-subtle">
+          <i class="fa-regular fa-circle-dot me-1"></i>Model siap
+        </span>
+        <span class="text-muted small">
+          <i class="fa-solid fa-microchip me-1"></i>Engine: YOLOv8 Pose
+        </span>
       </div>
-    </aside>
+    </div>
+  </header>
 
-    <!-- Main content -->
-    <main class="col-md-9 col-lg-10 p-4 p-lg-5">
-      <div class="d-flex flex-wrap align-items-center justify-content-between mb-4">
-        <div>
-          <h2 class="fw-bold mb-1">Analisis Panjang & Jumlah Ikan</h2>
-          <p class="text-muted mb-0">Unggah atau pilih video, lalu jalankan <span class="fw-semibold">Cek Ikan</span> untuk mendapatkan panjang ikan dan jumlah ikan secara otomatis.</p>
-        </div>
-      </div>
+  <!-- Content -->
+  <main class="content container-fluid py-4">
 
-      <div class="row g-4">
-        <!-- Panel input -->
-        <div class="col-lg-5">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-0 pb-0">
-              <h5 class="card-title mb-1"><i class="fa-solid fa-cloud-arrow-up me-2 text-primary"></i>Input Video</h5>
-              <p class="text-muted small mb-0">Gunakan video dari Google Drive (folder <code>videos</code>) atau unggah berkas baru.</p>
-            </div>
-            <div class="card-body">
-              <form method="post" action="{{ url_for('process') }}" enctype="multipart/form-data">
+    <div class="row g-4">
+      <!-- Panel upload -->
+      <section class="col-lg-3">
+        <div class="card card-elevated h-100">
+          <div class="card-body">
+            <h5 class="card-title mb-1">
+              <i class="fa-solid fa-cloud-arrow-up me-2 text-primary"></i>Unggah Video
+            </h5>
+            <p class="text-muted small mb-3">
+              Pilih video ikan mas dari kamera atas, kemudian jalankan analisis otomatis.
+            </p>
 
-                <!-- Pilih dari Drive -->
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Pilih dari Google Drive</label>
-                  <select class="form-select" name="selected_video">
-                    <option value="">— Pilih video di folder videos —</option>
-                    {% for v in videos %}
-                      <option value="{{ v }}" {% if selected_video==v %}selected{% endif %}>{{ v }}</option>
-                    {% endfor %}
-                  </select>
-                  <div class="form-text small">Folder fisik: <code>{{ "/videos" }}</code> (di-mount ke Google Drive).</div>
+            <form id="uploadForm" action="{{ url_for('upload_and_process') }}" method="post" enctype="multipart/form-data">
+              <div class="mb-3">
+                <label class="form-label small fw-semibold">Berkas video</label>
+                <input type="file" class="form-control form-control-sm" name="video" accept="video/*" required>
+                <div class="form-text small text-muted">
+                  Disarankan format MP4, durasi tidak terlalu panjang.
                 </div>
+              </div>
 
-                <div class="text-center my-2 text-muted small">atau</div>
+              <button type="submit" class="btn btn-primary w-100">
+                <i class="fa-solid fa-magnifying-glass-chart me-1"></i>Cek Ikan
+              </button>
+            </form>
 
-                <!-- Upload baru -->
-                <div class="mb-3">
-                  <label class="form-label fw-semibold">Upload video baru</label>
-                  <input class="form-control" type="file" name="uploaded_video" accept="video/*">
-                  <div class="form-text small">Format disarankan: MP4, durasi tidak terlalu panjang.</div>
-                </div>
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+              <div class="alert alert-warning mt-3 py-2 px-3 small mb-0">
+                {% for m in messages %}
+                  <div>{{ m }}</div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% endwith %}
 
-                <button type="submit" class="btn btn-primary w-100 mt-2">
-                  <i class="fa-solid fa-magnifying-glass-chart me-2"></i>Cek Ikan
-                </button>
-              </form>
-            </div>
+            {% if runs %}
+              <hr class="my-4">
+              <h6 class="fw-semibold small mb-2">Riwayat ringkas</h6>
+              <ul class="list-unstyled small mb-0">
+                {% for r in runs[-5:]|reverse %}
+                  <li class="d-flex align-items-center">
+                    <i class="fa-regular fa-file-lines text-primary me-2"></i>{{ r }}
+                  </li>
+                {% endfor %}
+              </ul>
+            {% endif %}
           </div>
         </div>
+      </section>
 
-        <!-- Panel hasil -->
-        <div class="col-lg-7">
-          <div class="card border-0 shadow-sm h-100">
-            <div class="card-header bg-white border-0 pb-0 d-flex justify-content-between align-items-center">
+      <!-- Panel hasil -->
+      <section class="col-lg-9">
+        <div class="card card-elevated mb-4">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
               <div>
-                <h5 class="card-title mb-1"><i class="fa-solid fa-gauge-high me-2 text-primary"></i>Hasil Analisis</h5>
-                <p class="text-muted small mb-0">Ringkasan panjang ikan dan estimasi jumlah ikan.</p>
+                <h5 class="card-title mb-1">
+                  <i class="fa-solid fa-chart-column me-2 text-primary"></i>Ringkasan Analisis
+                </h5>
+                <p class="text-muted small mb-0">
+                  Statistik panjang ikan berdasarkan hasil deteksi YOLOv8-Pose.
+                </p>
               </div>
             </div>
 
-            <div class="card-body">
-              {% if result %}
-                <div class="row g-3 mb-3">
-                  <div class="col-md-4">
-                    <div class="stat-card border rounded-3 p-3 h-100">
-                      <div class="text-uppercase small text-muted">Jumlah Ikan</div>
-                      <div class="fw-bold fs-4">{{ result.summary.estimated_fish_count or 0 }}</div>
-                      <div class="small text-muted">Estimasi dari modus deteksi per frame</div>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="stat-card border rounded-3 p-3 h-100">
-                      <div class="text-uppercase small text-muted">Ikan A (besar)</div>
-                      <div class="fw-bold fs-4">
-                        {% if result.summary.fish_A_cm %}
-                          {{ "%.1f"|format(result.summary.fish_A_cm) }} <span class="fs-6">cm</span>
-                        {% else %}—{% endif %}
-                      </div>
-                      <div class="small text-muted">Panjang maksimum terdeteksi</div>
-                    </div>
-                  </div>
-                  <div class="col-md-4">
-                    <div class="stat-card border rounded-3 p-3 h-100">
-                      <div class="text-uppercase small text-muted">Ikan B (kecil)</div>
-                      <div class="fw-bold fs-4">
-                        {% if result.summary.fish_B_cm %}
-                          {{ "%.1f"|format(result.summary.fish_B_cm) }} <span class="fs-6">cm</span>
-                        {% else %}—{% endif %}
-                      </div>
-                      <div class="small text-muted">Panjang minimum terdeteksi</div>
-                    </div>
+            {% if result %}
+              <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                  <div class="metric-card">
+                    <div class="metric-label">Jumlah ikan</div>
+                    <div class="metric-value">{{ result.summary.estimated_fish_count or 0 }}</div>
+                    <div class="metric-note">Modus jumlah deteksi per frame</div>
                   </div>
                 </div>
+                <div class="col-md-3">
+                  <div class="metric-card">
+                    <div class="metric-label">Ikan A (besar)</div>
+                    <div class="metric-value">
+                      {% if result.summary.fish_A_cm %}
+                        {{ "%.1f"|format(result.summary.fish_A_cm) }} <span class="metric-unit">cm</span>
+                      {% else %}—{% endif %}
+                    </div>
+                    <div class="metric-note">Panjang maksimum terdeteksi</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="metric-card">
+                    <div class="metric-label">Ikan B (kecil)</div>
+                    <div class="metric-value">
+                      {% if result.summary.fish_B_cm %}
+                        {{ "%.1f"|format(result.summary.fish_B_cm) }} <span class="metric-unit">cm</span>
+                      {% else %}—{% endif %}
+                    </div>
+                    <div class="metric-note">Panjang minimum terdeteksi</div>
+                  </div>
+                </div>
+                <div class="col-md-3">
+                  <div class="metric-card">
+                    <div class="metric-label">Rata-rata panjang</div>
+                    <div class="metric-value">
+                      {% if result.summary.mean_length_cm %}
+                        {{ "%.1f"|format(result.summary.mean_length_cm) }} <span class="metric-unit">cm</span>
+                      {% else %}—{% endif %}
+                    </div>
+                    <div class="metric-note">Rata-rata seluruh deteksi</div>
+                  </div>
+                </div>
+              </div>
 
-                <hr>
+              <div class="row g-4">
+                <div class="col-lg-6">
+                  <h6 class="fw-semibold mb-2">
+                    <i class="fa-solid fa-video me-2 text-primary"></i>Video hasil anotasi
+                  </h6>
+                  <div class="ratio ratio-16x9 rounded border">
+                    <video id="resultVideo" class="w-100 h-100" controls>
+                      <source src="{{ url_for('get_output_video', filename=result.output_video_name) }}" type="video/mp4">
+                      Browser Anda tidak mendukung pemutaran video.
+                    </video>
+                  </div>
+                  <p class="small text-muted mt-2 mb-0">
+                    Berkas: {{ result.output_video_name }}
+                  </p>
+                </div>
+                <div class="col-lg-6">
+                  <h6 class="fw-semibold mb-2">
+                    <i class="fa-solid fa-table-list me-2 text-primary"></i>Detail ringkasan
+                  </h6>
+                  <table class="table table-sm align-middle mb-3">
+                    <tbody class="small">
+                      <tr>
+                        <th class="w-50">Nama video input</th>
+                        <td>{{ result.input_video_name }}</td>
+                      </tr>
+                      <tr>
+                        <th>Run ID</th>
+                        <td>{{ result.run_id }}</td>
+                      </tr>
+                      <tr>
+                        <th>Panjang minimum</th>
+                        <td>
+                          {% if result.summary.min_length_cm %}
+                            {{ "%.2f"|format(result.summary.min_length_cm) }} cm
+                          {% else %}—{% endif %}
+                        </td>
+                      </tr>
+                      <tr>
+                        <th>Panjang maksimum</th>
+                        <td>
+                          {% if result.summary.max_length_cm %}
+                            {{ "%.2f"|format(result.summary.max_length_cm) }} cm
+                          {% else %}—{% endif %}
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
 
-                <div class="row g-3">
-                  <div class="col-md-6">
-                    <h6 class="fw-semibold mb-2">Statistik Panjang Ikan</h6>
-                    <ul class="list-unstyled small mb-0">
-                      <li><i class="fa-solid fa-circle-small text-primary me-2"></i>Rata-rata:
-                        {% if result.summary.mean_length_cm %}
-                          {{ "%.2f"|format(result.summary.mean_length_cm) }} cm
-                        {% else %}—{% endif %}
-                      </li>
-                      <li><i class="fa-solid fa-circle-small text-primary me-2"></i>Minimum:
-                        {% if result.summary.min_length_cm %}
-                          {{ "%.2f"|format(result.summary.min_length_cm) }} cm
-                        {% else %}—{% endif %}
-                      </li>
-                      <li><i class="fa-solid fa-circle-small text-primary me-2"></i>Maksimum:
-                        {% if result.summary.max_length_cm %}
-                          {{ "%.2f"|format(result.summary.max_length_cm) }} cm
-                        {% else %}—{% endif %}
-                      </li>
-                    </ul>
-                  </div>
-                  <div class="col-md-6">
-                    <h6 class="fw-semibold mb-2">Video Hasil Anotasi</h6>
-                    {% if result.output_video_name %}
-                      <video class="w-100 rounded-3 border" controls>
-                        <source src="{{ '/outputs/' + result.output_video_name }}" type="video/mp4">
-                        Browser Anda tidak mendukung pemutaran video.
-                      </video>
-                      <p class="small text-muted mt-1 mb-0">File: {{ result.output_video_name }}</p>
-                    {% else %}
-                      <p class="text-muted small mb-0">Belum ada video hasil analisis.</p>
-                    {% endif %}
-                  </div>
+                  <a class="btn btn-outline-primary btn-sm" href="{{ url_for('get_output_csv', filename=result.output_csv_name) }}">
+                    <i class="fa-solid fa-download me-1"></i>Unduh CSV ringkasan
+                  </a>
+
+                  <hr class="my-3">
+
+                  <h6 class="fw-semibold mb-2">
+                    <i class="fa-solid fa-chart-line me-2 text-primary"></i>Visualisasi sederhana
+                  </h6>
+                  <canvas id="lengthChart" height="140"></canvas>
                 </div>
-              {% else %}
-                <div class="text-center text-muted py-5">
-                  <i class="fa-regular fa-circle-play fa-3x mb-3"></i>
-                  <p class="mb-1">Belum ada analisis yang dijalankan.</p>
-                  <p class="small mb-0">Silakan pilih atau unggah video, lalu tekan tombol <strong>Cek Ikan</strong>.</p>
-                </div>
-              {% endif %}
-            </div>
+              </div>
+            {% else %}
+              <div class="placeholder-area text-center text-muted py-5">
+                <i class="fa-regular fa-circle-play fa-3x mb-3 text-primary"></i>
+                <p class="mb-1">Belum ada analisis yang dilakukan.</p>
+                <p class="small mb-0">Unggah video pada panel kiri, kemudian tekan <strong>Cek Ikan</strong> untuk memulai.</p>
+              </div>
+            {% endif %}
           </div>
         </div>
-      </div>
+      </section>
+    </div>
 
-    </main>
+  </main>
+</div>
+
+<!-- Overlay loading -->
+<div id="loadingOverlay" class="loading-overlay">
+  <div class="loading-card">
+    <div class="spinner-border text-primary mb-3" role="status"></div>
+    <p class="mb-0 small text-muted">Video sedang diproses, silakan tunggu...</p>
   </div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+
+{% if result %}
+<script>
+  // Data sederhana untuk Chart.js
+  const summary = {{ result.summary | tojson }};
+  const ctx = document.getElementById('lengthChart');
+  if (ctx) {
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: ['Min', 'Rata-rata', 'Maks'],
+        datasets: [{
+          label: 'Panjang ikan (cm)',
+          data: [
+            summary.min_length_cm || 0,
+            summary.mean_length_cm || 0,
+            summary.max_length_cm || 0
+          ]
+        }]
+      },
+      options: {
+        responsive: true,
+        scales: {
+          y: { beginAtZero: true }
+        }
+      }
+    });
+  }
+</script>
+{% endif %}
+
 </body>
 </html>

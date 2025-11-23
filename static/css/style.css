@@ -1,7 +1,134 @@
-body {
-  font-family: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+:root {
+  --bg-page: #f5f7fb;
+  --bg-card: #ffffff;
+  --border-soft: #e2e8f0;
+  --text-main: #111827;
+  --text-muted: #6b7280;
+  --primary: #2563eb;
+  --primary-soft: #e0edff;
 }
 
-.stat-card {
-  background: linear-gradient(135deg, #f8fafc, #eef2ff);
+body {
+  font-family: system-ui, -apple-system, "SF Pro Text", "Segoe UI", sans-serif;
+  background-color: var(--bg-page);
+  color: var(--text-main);
+}
+
+.page-wrapper {
+  min-height: 100vh;
+}
+
+/* Top bar */
+
+.topbar {
+  background-color: #ffffff;
+  border-bottom: 1px solid var(--border-soft);
+  padding: 0.6rem 0;
+}
+
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #3b82f6, #22c55e);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-size: 18px;
+}
+
+.brand-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.brand-subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Cards */
+
+.card-elevated {
+  border-radius: 1rem;
+  border: 1px solid var(--border-soft);
+  background-color: var(--bg-card);
+}
+
+.metric-card {
+  border-radius: 0.9rem;
+  border: 1px solid var(--border-soft);
+  background: linear-gradient(135deg, #ffffff, #eef2ff);
+  padding: 0.75rem 0.9rem;
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  color: var(--text-muted);
+}
+
+.metric-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.metric-unit {
+  font-size: 0.9rem;
+  margin-left: 0.1rem;
+  color: var(--text-muted);
+}
+
+.metric-note {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* Placeholder */
+
+.placeholder-area {
+  border-radius: 1rem;
+  border: 1px dashed var(--border-soft);
+  background: #f9fafb;
+}
+
+/* Loading overlay */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.18);
+  backdrop-filter: blur(2px);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+
+.loading-overlay.active {
+  display: flex;
+}
+
+.loading-card {
+  background: #ffffff;
+  border-radius: 0.9rem;
+  padding: 1.25rem 1.5rem;
+  box-shadow: 0 10px 40px rgba(15, 23, 42, 0.18);
+}
+
+/* Misc */
+
+.table {
+  border-color: var(--border-soft);
+}
+
+.table > :not(caption) > * > * {
+  padding: 0.4rem 0.6rem;
+}
+
+.form-text {
+  font-size: 0.75rem;
 }

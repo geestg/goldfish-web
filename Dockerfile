@@ -1,9 +1,7 @@
-# Dockerfile
 FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install dependency dasar
 RUN apt-get update && apt-get install -y \
     libgl1 libglib2.0-0 && \
     rm -rf /var/lib/apt/lists/*
@@ -13,14 +11,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Lokasi default model dan direktori IO
 ENV MODEL_PATH=/app/models/best.pt
-ENV VIDEO_DIR=/videos
-ENV OUTPUT_DIR=/outputs
+ENV UPLOAD_DIR=/app/uploads
+ENV OUTPUT_DIR=/app/outputs
 ENV PX_PER_CM=25.0
 
-# Buat folder output
-RUN mkdir -p /outputs
+RUN mkdir -p /app/uploads /app/outputs
 
 EXPOSE 8000
 
