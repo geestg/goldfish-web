@@ -1,4 +1,3 @@
-# app.py
 import os
 import uuid
 import statistics
@@ -17,74 +16,110 @@ from flask import (
     flash,
 )
 from ultralytics import YOLO
+from norfair import Detection, Tracker
 
-# ------------------ Konfigurasi dasar ------------------
+
+# ============================================================
+# KONFIGURASI DASAR
+# ============================================================
 
 BASE_DIR = Path(__file__).resolve().parent
 
-UPLOAD_DIR = Path(os.environ.get("UPLOAD_DIR", BASE_DIR / "uploads"))
-OUTPUT_DIR = Path(os.environ.get("OUTPUT_DIR", BASE_DIR / "outputs"))
-MODEL_PATH = Path(os.environ.get("MODEL_PATH", BASE_DIR / "models" / "best.pt"))
+UPLOAD_DIR = BASE_DIR / "uploads"
+OUTPUT_DIR = BASE_DIR / "outputs"
+MODEL_PATH = BASE_DIR / "models" / "best.pt"
 
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Faktor kalibrasi (px per cm). Silakan sesuaikan dengan hasil kalibrasi Anda.
+# Faktor kalibrasi — bisa Anda update sesuai eksperimen
 PX_PER_CM = float(os.environ.get("PX_PER_CM", 25.0))
 
-# Load model YOLOv8-Pose
+# Skip frame agar pemrosesan stabil
+FRAME_STEP = int(os.environ.get("FRAME_STEP", 3))
+
+# Batas kategori ikan
+BIG_FISH_THRESHOLD = float(os.environ.get("BIG_FISH_THRESHOLD", 12.0))
+SMALL_FISH_MIN = float(os.environ.get("SMALL_FISH_MIN", 6.0))
+
+# Load YOLOv8-Pose
 model = YOLO(str(MODEL_PATH))
 
 app = Flask(__name__)
-app.secret_key = "goldfish-secret-key"  # diperlukan untuk flash message
+app.secret_key = "goldfish-secret-key"
 
 
-# ------------------ Fungsi pengukuran ------------------
+# ============================================================
+# FUNGSI BANTU
+# ============================================================
 
 def hitung_panjang_ikan_kepala_ekor(keypoints_xy, px_per_cm: float):
     """
-    keypoints_xy : array (N, K, 2) -> N instance, K keypoints, (x, y)
-    Asumsi: indeks 0 = head, indeks 1 = tail.
-    Mengembalikan list panjang ikan dalam piksel dan cm.
+    Mengukur jarak kepala-ekor berdasarkan keypoints YOLO-Pose.
+    Index 0=head, 1=tail.
+    Noise filter: 4–40 cm.
     """
-    panjang_px, panjang_cm = [], []
+    panjang_cm = []
     for inst in keypoints_xy:
         head = inst[0]
         tail = inst[1]
-        dist_px = float(np.linalg.norm(head - tail))
+        dist_px = np.linalg.norm(head - tail)
         dist_cm = dist_px / px_per_cm
-        panjang_px.append(dist_px)
-        panjang_cm.append(dist_cm)
-    return panjang_px, panjang_cm
 
+        # Filter noise
+        if 4.0 <= dist_cm <= 40.0:
+            panjang_cm.append(dist_cm)
+
+    return panjang_cm
+
+
+def distance_norfair(detection: Detection, tracked_object):
+    """
+    Metode jarak Norfair: rata-rata Euclidean distance dari dua titik (head, tail).
+    """
+    return np.linalg.norm(detection.points - tracked_object.estimate, axis=1).mean()
+
+
+# NORFAIR Tracker
+tracker = Tracker(
+    distance_function=distance_norfair,
+    distance_threshold=35,   # sensitifitas tracking
+)
+
+
+# ============================================================
+# FUNGSI UTAMA PEMROSESAN VIDEO
+# ============================================================
 
 def proses_video(video_path: Path, px_per_cm: float = PX_PER_CM):
-    """
-    Memproses satu video:
-      - Jalankan YOLOv8-Pose per frame
-      - Hitung panjang ikan
-      - Simpan video beranotasi ke OUTPUT_DIR
-      - Simpan ringkasan ke file CSV
-    """
+
     cap = cv2.VideoCapture(str(video_path))
     if not cap.isOpened():
         raise RuntimeError(f"Tidak dapat membuka video: {video_path}")
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
+    fps = cap.get(cv2.CAP_PROP_FPS) or 25
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
     run_id = uuid.uuid4().hex[:8]
-    out_video_name = f"annotated_{run_id}.mp4"
-    out_video_path = OUTPUT_DIR / out_video_name
-    out_csv_name = f"summary_{run_id}.csv"
-    out_csv_path = OUTPUT_DIR / out_csv_name
+    out_video = f"annotated_{run_id}.mp4"
+    out_csv = f"summary_{run_id}.csv"
 
-    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out_video_path = OUTPUT_DIR / out_video
+    out_csv_path = OUTPUT_DIR / out_csv
+
+    # Encoder H.264 agar bisa diputar di browser
+    fourcc = cv2.VideoWriter_fourcc(*"avc1")
     writer = cv2.VideoWriter(str(out_video_path), fourcc, fps, (width, height))
 
-    all_lengths_cm = []
-    fish_counts = []
+    # Reset tracker setiap video baru
+    global tracker
+    tracker = Tracker(distance_function=distance_norfair, distance_threshold=35)
+
+    # Penyimpanan data panjang per ID
+    length_history = {}
+    all_lengths = []
+
     frame_index = 0
 
     while True:
@@ -93,118 +128,148 @@ def proses_video(video_path: Path, px_per_cm: float = PX_PER_CM):
             break
         frame_index += 1
 
+        # Skip sebagian frame
+        if FRAME_STEP > 1 and (frame_index % FRAME_STEP) != 0:
+            writer.write(frame)
+            continue
+
+        # Deteksi YOLOv8-Pose
         results = model(frame, verbose=False)[0]
 
+        detections = []
+
         if results.keypoints is not None:
-            kpts_xy = results.keypoints.xy.cpu().numpy()  # (N, K, 2)
-            lengths_px, lengths_cm = hitung_panjang_ikan_kepala_ekor(
-                kpts_xy, px_per_cm
-            )
+            kpts_xy = results.keypoints.xy.cpu().numpy()
 
-            all_lengths_cm.extend(lengths_cm)
-            fish_counts.append(len(lengths_cm))
+            # Hitung panjang
+            lengths = hitung_panjang_ikan_kepala_ekor(kpts_xy, px_per_cm)
 
-            # Gambar anotasi ke frame
-            for i, inst in enumerate(kpts_xy):
-                head = inst[0]
-                tail = inst[1]
-                length_cm = lengths_cm[i]
+            # Sinkronisasi
+            n = min(len(kpts_xy), len(lengths))
 
-                p1 = (int(head[0]), int(head[1]))
-                p2 = (int(tail[0]), int(tail[1]))
+            for i in range(n):
+                head = kpts_xy[i][0]
+                tail = kpts_xy[i][1]
+                length_cm = float(lengths[i])
 
-                cv2.line(frame, p1, p2, (0, 170, 255), 2)
-                cv2.circle(frame, p1, 5, (0, 102, 204), -1)
-                cv2.circle(frame, p2, 5, (0, 204, 102), -1)
+                points = np.vstack([head, tail])
+                det = Detection(points=points, data={"length_cm": length_cm})
+                detections.append(det)
 
-                label = f"{length_cm:.1f} cm"
-                cv2.putText(
-                    frame,
-                    label,
-                    (p1[0], max(p1[1] - 10, 20)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (0, 0, 0),
-                    3,
-                    cv2.LINE_AA,
-                )
-                cv2.putText(
-                    frame,
-                    label,
-                    (p1[0], max(p1[1] - 10, 20)),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6,
-                    (255, 255, 255),
-                    1,
-                    cv2.LINE_AA,
-                )
+        # Update tracker
+        tracked = tracker.update(detections)
+
+        # Anotasi
+        for obj in tracked:
+            tid = obj.id
+            head_est, tail_est = obj.estimate
+
+            # Ambil panjang dari deteksi terakhir
+            if obj.last_detection is None:
+                continue
+            length_cm = obj.last_detection.data["length_cm"]
+
+            # Simpan histori
+            all_lengths.append(length_cm)
+            length_history.setdefault(tid, []).append(length_cm)
+
+            p1 = (int(head_est[0]), int(head_est[1]))
+            p2 = (int(tail_est[0]), int(tail_est[1]))
+
+            cv2.line(frame, p1, p2, (0, 170, 255), 2)
+            cv2.circle(frame, p1, 5, (0, 102, 204), -1)
+            cv2.circle(frame, p2, 5, (0, 204, 102), -1)
+
+            label = f"ID {tid} | {length_cm:.1f} cm"
+            cv2.putText(frame, label, (p1[0], p1[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            cv2.putText(frame, label, (p1[0], p1[1] - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
 
         writer.write(frame)
 
     cap.release()
     writer.release()
 
-    if not all_lengths_cm:
-        summary = {
-            "estimated_fish_count": 0,
-            "fish_A_cm": None,
-            "fish_B_cm": None,
-            "mean_length_cm": None,
-            "min_length_cm": None,
-            "max_length_cm": None,
-        }
-    else:
-        mean_len = float(np.mean(all_lengths_cm))
-        min_len = float(np.min(all_lengths_cm))
-        max_len = float(np.max(all_lengths_cm))
+    # ============================================================
+    # RINGKASAN HASIL
+    # ============================================================
 
-        try:
-            est_count = int(statistics.mode(fish_counts))
-        except statistics.StatisticsError:
-            est_count = int(round(np.mean(fish_counts)))
-
-        summary = {
-            "estimated_fish_count": est_count,
-            "fish_A_cm": max_len,
-            "fish_B_cm": min_len,
-            "mean_length_cm": mean_len,
-            "min_length_cm": min_len,
-            "max_length_cm": max_len,
+    if not all_lengths or not length_history:
+        return {
+            "run_id": run_id,
+            "input_video_name": video_path.name,
+            "output_video_name": out_video,
+            "output_csv_name": out_csv,
+            "summary": {
+                "estimated_fish_count": 0,
+                "fish_big_cm": None,
+                "fish_small_cm": None,
+                "min_length_cm": None,
+                "max_length_cm": None,
+                "fish_details": [],
+            }
         }
 
-    # Simpan ringkasan ke CSV
+    all_arr = np.array(all_lengths)
+    min_len = float(all_arr.min())
+    max_len = float(all_arr.max())
+
+    fish_details = []
+    for tid, vals in length_history.items():
+        if vals:
+            fish_details.append({
+                "id": f"Ikan {tid}",
+                "mean_length_cm": float(np.mean(vals)),
+            })
+
+    # Urutkan berdasarkan ID
+    fish_details.sort(key=lambda x: int(x["id"].split()[-1]))
+
+    # Kategori besar/kecil
+    big_vals = [f["mean_length_cm"] for f in fish_details if f["mean_length_cm"] >= BIG_FISH_THRESHOLD]
+    small_vals = [f["mean_length_cm"] for f in fish_details if SMALL_FISH_MIN <= f["mean_length_cm"] < BIG_FISH_THRESHOLD]
+
+    summary = {
+        "estimated_fish_count": len(fish_details),
+        "fish_big_cm": float(np.mean(big_vals)) if big_vals else None,
+        "fish_small_cm": float(np.mean(small_vals)) if small_vals else None,
+        "min_length_cm": min_len,
+        "max_length_cm": max_len,
+        "fish_details": fish_details,
+    }
+
+    # Simpan CSV
     with open(out_csv_path, "w", newline="", encoding="utf-8") as f:
-        writer_csv = csv.writer(f)
-        writer_csv.writerow(["run_id", run_id])
-        writer_csv.writerow(["video_name", video_path.name])
-        writer_csv.writerow(["px_per_cm", px_per_cm])
-        writer_csv.writerow([])
-        writer_csv.writerow(["metric", "value"])
-        for key, value in summary.items():
-            writer_csv.writerow([key, value])
+        w = csv.writer(f)
+        w.writerow(["run_id", run_id])
+        w.writerow(["video_name", video_path.name])
+        w.writerow(["px_per_cm", px_per_cm])
+        w.writerow([])
+        w.writerow(["metric", "value"])
+        for k, v in summary.items():
+            w.writerow([k, v])
 
     return {
         "run_id": run_id,
         "input_video_name": video_path.name,
-        "output_video_name": out_video_name,
-        "output_csv_name": out_csv_name,
+        "output_video_name": out_video,
+        "output_csv_name": out_csv,
         "summary": summary,
     }
 
 
-# ------------------ Route Flask ------------------
+# ============================================================
+# ROUTES
+# ============================================================
 
 def list_previous_runs():
-    summaries = []
-    for csv_file in sorted(OUTPUT_DIR.glob("summary_*.csv")):
-        summaries.append(csv_file.name)
-    return summaries
+    return sorted([x.name for x in OUTPUT_DIR.glob("summary_*.csv")])
 
 
 @app.route("/", methods=["GET"])
 def index():
-    runs = list_previous_runs()
-    return render_template("index.html", result=None, runs=runs)
+    return render_template("index.html", result=None, runs=list_previous_runs())
 
 
 @app.route("/upload", methods=["POST"])
@@ -226,11 +291,10 @@ def upload_and_process():
     try:
         result = proses_video(save_path, px_per_cm=PX_PER_CM)
     except Exception as e:
-        flash(f"Terjadi kesalahan saat memproses video: {e}")
+        flash(f"Terjadi kesalahan: {e}")
         return redirect(url_for("index"))
 
-    runs = list_previous_runs()
-    return render_template("index.html", result=result, runs=runs)
+    return render_template("index.html", result=result, runs=list_previous_runs())
 
 
 @app.route("/outputs/video/<path:filename>")
