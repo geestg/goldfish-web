@@ -1,6 +1,17 @@
-flask
-gunicorn
-numpy==1.26.4
+flask==2.3.3
+gunicorn==21.2.0
+
+# Core libs
+numpy<2.0
+opencv-python==4.8.1.78
 opencv-python-headless==4.8.1.78
-ultralytics==8.3.0
-norfair
+
+# YOLO model
+ultralytics==8.0.196
+
+# Tracking (ID per ikan)
+norfair==2.2.0
+
+# Torch for YOLO
+torch==2.0.1
+torchvision==0.15.2

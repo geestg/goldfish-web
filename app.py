@@ -1,341 +1,273 @@
 import os
 import uuid
-import statistics
-from pathlib import Path
-import csv
+import time
+from datetime import datetime
 
 import cv2
 import numpy as np
+import pandas as pd
 from flask import (
     Flask,
     render_template,
     request,
-    redirect,
-    url_for,
+    jsonify,
     send_from_directory,
-    flash,
+    url_for,
 )
 from ultralytics import YOLO
+from norfair import Detection, Tracker
+
+# =================================================================
+# Custom Euclidean Distance (karena norfair==2.2.0 tidak punya lagi)
+# =================================================================
+def euclidean_distance(points1, points2):
+    """
+    Distance function untuk Norfair Tracking.
+    points1 dan points2 = array Nx2.
+    """
+    return np.linalg.norm(points1 - points2, axis=1)
 
 
-# ---------------------------------------------------
-# Konfigurasi dasar
-# ---------------------------------------------------
+# =================================================================
+# Konfigurasi dasar folder
+# =================================================================
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-BASE_DIR = Path(__file__).resolve().parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-OUTPUT_DIR = BASE_DIR / "outputs"
-MODEL_PATH = BASE_DIR / "models" / "best.pt"
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+OUTPUT_DIR = os.path.join(BASE_DIR, "outputs")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
 
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
 
-PX_PER_CM = float(os.environ.get("PX_PER_CM", 25.0))
-FRAME_STEP = int(os.environ.get("FRAME_STEP", 4))
+# Kalibrasi piksel ke cm (silakan sesuaikan)
+PX_PER_CM = 25.0
 
-BIG_FISH_THRESHOLD = float(os.environ.get("BIG_FISH_THRESHOLD", 12.0))
-SMALL_FISH_MIN = float(os.environ.get("SMALL_FISH_MIN", 6.0))
 
-# Load model YOLO
-model = YOLO(str(MODEL_PATH))
+# =================================================================
+# Load model YOLO Pose
+# =================================================================
+print(f"[INFO] Loading YOLO Pose model from: {MODEL_PATH}")
+model = YOLO(MODEL_PATH)
+
+
+# =================================================================
+# Tracker Norfair
+# =================================================================
+tracker = Tracker(
+    distance_function=euclidean_distance,
+    distance_threshold=30,
+)
+
 
 app = Flask(__name__)
-app.secret_key = "goldfish-secret-key"
 
 
-# ---------------------------------------------------
-# Fungsi bantu
-# ---------------------------------------------------
-
-def hitung_panjang_ikan_kepala_ekor(keypoints_xy, px_per_cm: float):
-    panjang_px, panjang_cm = [], []
-    for inst in keypoints_xy:
-        head = inst[0]
-        tail = inst[1]
-        dist_px = float(np.linalg.norm(head - tail))
-        dist_cm = dist_px / px_per_cm
-
-        if 3.0 <= dist_cm <= 30.0:
-            panjang_px.append(dist_px)
-            panjang_cm.append(dist_cm)
-
-    return panjang_px, panjang_cm
+def generate_run_id():
+    """Membuat ID unik untuk setiap proses video."""
+    return datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:6]
 
 
-def iou_xyxy(box1, box2):
-    x1 = max(box1[0], box2[0])
-    y1 = max(box1[1], box2[1])
-    x2 = min(box1[2], box2[2])
-    y2 = min(box1[3], box2[3])
+# =================================================================
+# PROSES VIDEO
+# =================================================================
+def process_video(input_path: str):
+    run_id = generate_run_id()
+    print(f"[INFO] Start processing video, run_id={run_id}")
 
-    inter_w = max(0.0, x2 - x1)
-    inter_h = max(0.0, y2 - y1)
-    inter_area = inter_w * inter_h
-    if inter_area <= 0:
-        return 0.0
-
-    area1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    area2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-    union = area1 + area2 - inter_area
-    if union <= 0:
-        return 0.0
-
-    return float(inter_area / union)
-
-
-class SimpleFishTracker:
-    def __init__(self, iou_threshold=0.35, max_lost=15):
-        self.next_id = 1
-        self.tracks = {}
-        self.iou_threshold = iou_threshold
-        self.max_lost = max_lost
-
-    def update(self, detections, frame_idx):
-        assigned_tracks = set()
-        results = []
-
-        for tid in list(self.tracks.keys()):
-            if self.tracks[tid]["last_frame"] < frame_idx:
-                self.tracks[tid]["lost"] += 1
-                if self.tracks[tid]["lost"] > self.max_lost:
-                    del self.tracks[tid]
-
-        for det in detections:
-            db = det["bbox"]
-            best_iou = 0.0
-            best_id = None
-
-            for tid, tinfo in self.tracks.items():
-                if tid in assigned_tracks:
-                    continue
-                iou = iou_xyxy(tinfo["bbox"], db)
-                if iou > best_iou:
-                    best_iou = iou
-                    best_id = tid
-
-            if best_id is not None and best_iou >= self.iou_threshold:
-                self.tracks[best_id]["bbox"] = db
-                self.tracks[best_id]["last_frame"] = frame_idx
-                self.tracks[best_id]["lost"] = 0
-                assigned_tracks.add(best_id)
-
-                results.append(
-                    {"track_id": best_id, "bbox": db, "length_cm": det["length_cm"]}
-                )
-            else:
-                tid = self.next_id
-                self.next_id += 1
-
-                self.tracks[tid] = {
-                    "bbox": db,
-                    "last_frame": frame_idx,
-                    "lost": 0,
-                }
-                assigned_tracks.add(tid)
-
-                results.append(
-                    {"track_id": tid, "bbox": db, "length_cm": det["length_cm"]}
-                )
-
-        return results
-
-
-# ---------------------------------------------------
-# Fungsi utama pemrosesan video
-# ---------------------------------------------------
-
-def proses_video(video_path: Path, px_per_cm: float = PX_PER_CM):
-    cap = cv2.VideoCapture(str(video_path))
+    cap = cv2.VideoCapture(input_path)
     if not cap.isOpened():
-        raise RuntimeError(f"Tidak dapat membuka video: {video_path}")
+        raise RuntimeError("Video tidak dapat dibuka.")
 
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    if fps <= 0:
+        fps = 25.0
+
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    run_id = uuid.uuid4().hex[:8]
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    output_video_name = f"{run_id}_annotated.mp4"
+    output_csv_name = f"{run_id}_summary.csv"
 
-    # ---- FIX: H.264 diganti AVI MJPG ----
-    out_video_name = f"annotated_{run_id}.avi"
-    out_video_path = OUTPUT_DIR / out_video_name
-    fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+    output_video_path = os.path.join(OUTPUT_DIR, output_video_name)
+    output_csv_path = os.path.join(OUTPUT_DIR, output_csv_name)
 
-    writer = cv2.VideoWriter(str(out_video_path), fourcc, fps, (width, height))
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
 
-    tracker = SimpleFishTracker()
+    records = []
+    frame_idx = 0
+    total_detections = 0
+    t0 = time.time()
 
-    length_history = {}
-    all_lengths_cm = []
-
-    frame_index = 0
+    global tracker
+    tracker = Tracker(
+        distance_function=euclidean_distance,
+        distance_threshold=30,
+    )
 
     while True:
         ret, frame = cap.read()
         if not ret:
             break
-        frame_index += 1
 
-        if FRAME_STEP > 1 and frame_index % FRAME_STEP != 0:
-            writer.write(frame)
-            continue
-
-        results = model(frame, verbose=False)[0]
+        frame_idx += 1
+        results = model(frame, verbose=False)
+        res = results[0]
 
         detections = []
-        if results.keypoints is not None and results.boxes is not None:
 
-            kpts_xy = results.keypoints.xy.cpu().numpy()
-            boxes_xyxy = results.boxes.xyxy.cpu().numpy()
+        if res.keypoints is not None:
+            kpts = res.keypoints.xy.cpu().numpy()
+            num_instances = kpts.shape[0]
 
-            _, lengths_cm = hitung_panjang_ikan_kepala_ekor(kpts_xy, px_per_cm)
+            boxes = None
+            confs = None
+            if res.boxes is not None and len(res.boxes) == num_instances:
+                boxes = res.boxes.xyxy.cpu().numpy()
+                confs = res.boxes.conf.cpu().numpy()
 
-            n = min(len(boxes_xyxy), len(lengths_cm))
-            for i in range(n):
-                detections.append(
-                    {"bbox": boxes_xyxy[i].tolist(), "length_cm": float(lengths_cm[i])}
+            for i in range(num_instances):
+                head = kpts[i, 0]
+                tail = kpts[i, 1]
+
+                length_px = np.linalg.norm(head - tail)
+                length_cm = length_px / PX_PER_CM if PX_PER_CM > 0 else 0.0
+
+                score = float(confs[i]) if confs is not None else 1.0
+
+                cx = (head[0] + tail[0]) / 2.0
+                cy = (head[1] + tail[1]) / 2.0
+
+                det = Detection(
+                    points=np.array([[cx, cy]]),
+                    scores=np.array([score]),
+                    data={
+                        "head": head,
+                        "tail": tail,
+                        "length_cm": float(length_cm),
+                    },
                 )
+                detections.append(det)
 
-        tracked = tracker.update(detections, frame_index)
+        tracks = tracker.update(detections=detections)
 
-        for obj in tracked:
-            tid = obj["track_id"]
-            bbox = obj["bbox"]
-            length_cm = obj["length_cm"]
+        # Gambar pada frame
+        for track in tracks:
+            if track.last_detection is None:
+                continue
+            data = track.last_detection.data
 
-            all_lengths_cm.append(length_cm)
-            length_history.setdefault(tid, []).append(length_cm)
+            head = data["head"]
+            tail = data["tail"]
+            length_cm = data["length_cm"]
+            track_id = track.id
 
-            x1, y1, x2, y2 = map(int, bbox)
+            p1 = (int(head[0]), int(head[1]))
+            p2 = (int(tail[0]), int(tail[1]))
 
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 200, 255), 2)
-            label = f"ID {tid} | {length_cm:.1f} cm"
+            cv2.line(frame, p1, p2, (0, 255, 0), 2)
+
+            text = f"ID {track_id} | {length_cm:.1f} cm"
+            cx = int((head[0] + tail[0]) / 2)
+            cy = int((head[1] + tail[1]) / 2) - 10
+            cy = max(cy, 20)
 
             cv2.putText(
-                frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 3
-            )
-            cv2.putText(
-                frame, label, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1
+                frame,
+                text,
+                (cx, cy),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (0, 255, 0),
+                2,
+                cv2.LINE_AA,
             )
 
-        writer.write(frame)
+            records.append(
+                {
+                    "run_id": run_id,
+                    "frame_index": frame_idx,
+                    "track_id": int(track_id),
+                    "length_cm": float(length_cm),
+                }
+            )
+
+        total_detections += len(tracks)
+        out.write(frame)
 
     cap.release()
-    writer.release()
+    out.release()
 
-    # ------------------ Ringkasan ------------------
+    t1 = time.time()
+    elapsed = t1 - t0
 
-    if not all_lengths_cm:
-        summary = {
-            "estimated_fish_count": 0,
-            "fish_big_cm": None,
-            "fish_small_cm": None,
-            "min_length_cm": None,
-            "max_length_cm": None,
-            "fish_details": [],
-        }
+    if len(records) > 0:
+        df = pd.DataFrame(records)
+        df.to_csv(output_csv_path, index=False)
+        mean_length = df["length_cm"].mean()
+        max_length = df["length_cm"].max()
+        min_length = df["length_cm"].min()
+        unique_ids = df["track_id"].nunique()
     else:
-        all_arr = np.array(all_lengths_cm, dtype=float)
-        min_len = float(all_arr.min())
-        max_len = float(all_arr.max())
+        df = pd.DataFrame(columns=["run_id", "frame_index", "track_id", "length_cm"])
+        df.to_csv(output_csv_path, index=False)
+        mean_length = max_length = min_length = 0.0
+        unique_ids = 0
 
-        fish_details = []
-        for tid, vals in length_history.items():
-            fish_details.append(
-                {"id": f"Ikan {tid}", "mean_length_cm": float(np.mean(vals))}
-            )
-
-        fish_details.sort(key=lambda x: int(x["id"].split()[-1]))
-
-        big_lengths = [
-            d["mean_length_cm"] for d in fish_details if d["mean_length_cm"] >= BIG_FISH_THRESHOLD
-        ]
-
-        small_lengths = [
-            d["mean_length_cm"]
-            for d in fish_details
-            if SMALL_FISH_MIN <= d["mean_length_cm"] < BIG_FISH_THRESHOLD
-        ]
-
-        summary = {
-            "estimated_fish_count": len(fish_details),
-            "fish_big_cm": float(np.mean(big_lengths)) if big_lengths else None,
-            "fish_small_cm": float(np.mean(small_lengths)) if small_lengths else None,
-            "min_length_cm": min_len,
-            "max_length_cm": max_len,
-            "fish_details": fish_details,
-        }
-
-    out_csv_name = f"summary_{run_id}.csv"
-    out_csv_path = OUTPUT_DIR / out_csv_name
-
-    with open(out_csv_path, "w", newline="", encoding="utf-8") as f:
-        writer_csv = csv.writer(f)
-        writer_csv.writerow(["run_id", run_id])
-        writer_csv.writerow(["video_name", video_path.name])
-        writer_csv.writerow(["px_per_cm", px_per_cm])
-        writer_csv.writerow([])
-        writer_csv.writerow(["metric", "value"])
-        for k, v in summary.items():
-            writer_csv.writerow([k, v])
-
-    return {
+    summary = {
         "run_id": run_id,
-        "input_video_name": video_path.name,
-        "output_video_name": out_video_name,
-        "output_csv_name": out_csv_name,
-        "summary": summary,
+        "frames": frame_idx,
+        "total_detections": int(total_detections),
+        "unique_fish_ids": int(unique_ids),
+        "mean_length_cm": float(mean_length),
+        "max_length_cm": float(max_length),
+        "min_length_cm": float(min_length),
+        "processing_time_sec": float(elapsed),
     }
 
+    return output_video_name, output_csv_name, summary
 
-# ---------------------------------------------------
+
+# =================================================================
 # ROUTES FLASK
-# ---------------------------------------------------
+# =================================================================
 
-def list_previous_runs():
-    return sorted([f.name for f in OUTPUT_DIR.glob("summary_*.csv")])
-
-
-@app.route("/")
+@app.route("/", methods=["GET"])
 def index():
-    runs = list_previous_runs()
-    return render_template("index.html", result=None, runs=runs)
+    return render_template("index.html")
 
 
 @app.route("/upload", methods=["POST"])
-def upload_and_process():
+def upload_video():
     if "video" not in request.files:
-        flash("Tidak ada berkas video.")
-        return redirect(url_for("index"))
+        return jsonify({"status": "error", "message": "File video tidak ditemukan."}), 400
 
     file = request.files["video"]
     if file.filename == "":
-        flash("Nama berkas kosong.")
-        return redirect(url_for("index"))
+        return jsonify({"status": "error", "message": "Nama file kosong."}), 400
 
-    ext = Path(file.filename).suffix
-    safe_name = f"input_{uuid.uuid4().hex[:8]}{ext}"
-
-    save_path = UPLOAD_DIR / safe_name
-    file.save(str(save_path))
+    save_path = os.path.join(UPLOAD_DIR, file.filename)
+    file.save(save_path)
 
     try:
-        result = proses_video(save_path)
+        video_name, csv_name, summary = process_video(save_path)
     except Exception as e:
-        flash(f"Terjadi kesalahan saat memproses video: {e}")
-        return redirect(url_for("index"))
+        return jsonify({"status": "error", "message": str(e)}), 500
 
-    runs = list_previous_runs()
-    return render_template("index.html", result=result, runs=runs)
+    return jsonify(
+        {
+            "status": "ok",
+            "video_url": url_for("get_output_file", filename=video_name),
+            "csv_url": url_for("get_output_file", filename=csv_name),
+            "summary": summary,
+        }
+    )
 
 
-@app.route("/outputs/video/<path:filename>")
-def get_output_video(filename):
-    return send_from_directory(OUTPUT_DIR, filename)
-
-
-@app.route("/outputs/csv/<path:filename>")
-def get_output_csv(filename):
-    return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
+@app.route("/outputs/<path:filename>")
+def get_output_file(filename):
+    return send_from_directory(OUTPUT_DIR, filename, as_attachment=False)
 
 
 if __name__ == "__main__":
