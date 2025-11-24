@@ -31,7 +31,7 @@
         <div>
           <div class="brand-main">Goldfish Pose Analyzer</div>
           <div class="brand-sub">
-            Analisis panjang ikan berbasis YOLOv8-Pose + Norfair Tracking
+            Analisis panjang dan jumlah ikan berbasis YOLOv8-Pose
           </div>
         </div>
       </div>
@@ -39,11 +39,11 @@
       <div class="d-flex align-items-center gap-3 topnav-right">
         <div class="chip chip-soft">
           <i class="fa-regular fa-circle-check me-1"></i>
-          Model aktif
+          Model siap digunakan
         </div>
         <div class="chip chip-ghost d-none d-md-inline-flex">
           <i class="fa-solid fa-microchip me-1"></i>
-          Engine Tracking: Norfair
+          Engine: YOLOv8-Pose
         </div>
       </div>
     </div>
@@ -64,7 +64,7 @@
               <div>
                 <div class="section-heading">Unggah Video</div>
                 <div class="section-caption">
-                  Gunakan rekaman kamera atas dengan ikan bergerak bebas.
+                  Gunakan rekaman dari kamera atas dengan ikan mas di dalam kolam atau akuarium.
                 </div>
               </div>
             </div>
@@ -84,7 +84,7 @@
                        accept="video/*"
                        required>
                 <div class="form-text form-text-extra">
-                  Format disarankan: MP4 (H.264)
+                  Disarankan format MP4, durasi 10–60 detik agar proses lebih cepat.
                 </div>
               </div>
 
@@ -139,7 +139,7 @@
                   Ringkasan Analisis
                 </div>
                 <div class="section-caption">
-                  Data dihitung dari deteksi pose YOLOv8 dan pelacakan Norfair ID.
+                  Statistik diperoleh dari deteksi keypoint kepala–ekor dan pelacakan ID ikan pada frame video yang diproses.
                 </div>
               </div>
 
@@ -160,7 +160,7 @@
             </div>
 
             {% if result %}
-              <!-- Metrics -->
+              <!-- Metrics row: jumlah, ikan besar, ikan kecil -->
               <div class="row g-3 mb-4">
                 <div class="col-lg-4 col-sm-6">
                   <div class="stat-card">
@@ -172,7 +172,7 @@
                       {{ result.summary.estimated_fish_count or 0 }}
                     </div>
                     <div class="stat-note">
-                      Berdasarkan ID yang terlacak stabil.
+                      Perkiraan jumlah individu berdasarkan ID hasil pelacakan.
                     </div>
                   </div>
                 </div>
@@ -184,11 +184,12 @@
                     <div class="stat-label">Ikan terbesar</div>
                     <div class="stat-value">
                       {% if result.summary.fish_big_cm %}
-                        {{ "%.1f"|format(result.summary.fish_big_cm) }} <span class="stat-unit">cm</span>
+                        {{ "%.1f"|format(result.summary.fish_big_cm) }}
+                        <span class="stat-unit">cm</span>
                       {% else %}—{% endif %}
                     </div>
                     <div class="stat-note">
-                      Rata-rata panjang ikan kategori besar (≥ 12 cm)
+                      Rata-rata panjang ikan kategori besar (≥ 12 cm).
                     </div>
                   </div>
                 </div>
@@ -200,11 +201,12 @@
                     <div class="stat-label">Ikan terkecil</div>
                     <div class="stat-value">
                       {% if result.summary.fish_small_cm %}
-                        {{ "%.1f"|format(result.summary.fish_small_cm) }} <span class="stat-unit">cm</span>
+                        {{ "%.1f"|format(result.summary.fish_small_cm) }}
+                        <span class="stat-unit">cm</span>
                       {% else %}—{% endif %}
                     </div>
                     <div class="stat-note">
-                      Kategori kecil (6–<12 cm)
+                      Rata-rata panjang ikan kategori kecil (6–<12 cm).
                     </div>
                   </div>
                 </div>
@@ -215,7 +217,7 @@
                 <div class="col-lg-6">
                   <h6 class="subsection-heading mb-2">
                     <i class="fa-solid fa-video me-2 text-primary"></i>
-                    Hasil Anotasi Video
+                    Video hasil anotasi
                   </h6>
                   <div class="ratio ratio-16x9 video-shell">
                     <video id="resultVideo" class="w-100 h-100" controls>
@@ -224,7 +226,7 @@
                     </video>
                   </div>
                   <div class="small text-muted mt-2">
-                    Output video:
+                    Berkas output:
                     <span class="fw-semibold">{{ result.output_video_name }}</span>
                   </div>
                 </div>
@@ -242,7 +244,11 @@
                       <td>{{ result.input_video_name }}</td>
                     </tr>
                     <tr>
-                      <th>Panjang minimum</th>
+                      <th>Run ID</th>
+                      <td>{{ result.run_id }}</td>
+                    </tr>
+                    <tr>
+                      <th>Panjang minimum terdeteksi</th>
                       <td>
                         {% if result.summary.min_length_cm %}
                           {{ "%.2f"|format(result.summary.min_length_cm) }} cm
@@ -250,7 +256,7 @@
                       </td>
                     </tr>
                     <tr>
-                      <th>Panjang maksimum</th>
+                      <th>Panjang maksimum terdeteksi</th>
                       <td>
                         {% if result.summary.max_length_cm %}
                           {{ "%.2f"|format(result.summary.max_length_cm) }} cm
@@ -270,29 +276,29 @@
 
                   <h6 class="subsection-heading mb-2">
                     <i class="fa-solid fa-list-ol me-2 text-primary"></i>
-                    Rata-rata panjang per ID ikan
+                    Rangkuman per ikan (berdasarkan ID)
                   </h6>
 
                   {% if result.summary.fish_details %}
                     <table class="table table-sm align-middle mb-0">
                       <thead class="small text-muted">
-                        <tr>
-                          <th>ID Ikan</th>
-                          <th>Panjang rata-rata</th>
-                        </tr>
+                      <tr>
+                        <th class="w-25">ID Ikan</th>
+                        <th>Panjang rata-rata</th>
+                      </tr>
                       </thead>
                       <tbody class="small">
-                        {% for f in result.summary.fish_details %}
-                          <tr>
-                            <td>{{ f.id }}</td>
-                            <td>{{ "%.2f"|format(f.mean_length_cm) }} cm</td>
-                          </tr>
-                        {% endfor %}
+                      {% for f in result.summary.fish_details %}
+                        <tr>
+                          <td>{{ f.id }}</td>
+                          <td>{{ "%.2f"|format(f.mean_length_cm) }} cm</td>
+                        </tr>
+                      {% endfor %}
                       </tbody>
                     </table>
                   {% else %}
                     <p class="small text-muted mb-0">
-                      Tidak ada data panjang yang valid.
+                      Belum ada data panjang ikan yang dapat dirangkum.
                     </p>
                   {% endif %}
                 </div>
@@ -304,10 +310,11 @@
                   <i class="fa-regular fa-circle-play"></i>
                 </div>
                 <div class="empty-title">
-                  Belum ada analisis dijalankan
+                  Belum ada analisis yang dijalankan
                 </div>
                 <div class="empty-caption">
-                  Unggah video dan tekan <b>Cek Ikan</b>.
+                  Unggah sebuah video pada panel kiri, kemudian tekan
+                  <span class="fw-semibold">Cek Ikan</span> untuk memulai proses.
                 </div>
               </div>
             {% endif %}
@@ -318,13 +325,13 @@
   </main>
 </div>
 
-<!-- Loading Overlay -->
+<!-- Loading overlay -->
 <div id="loadingOverlay" class="loading-overlay">
   <div class="loading-card">
     <div class="spinner-border text-primary mb-3" role="status"></div>
-    <p class="mb-1 fw-semibold">Video sedang dianalisis...</p>
+    <p class="mb-1 fw-semibold">Video sedang dianalisis</p>
     <p class="mb-0 small text-muted">
-      Sistem menjalankan deteksi pose, tracking ID, dan pengukuran panjang ikan.
+      Sistem menjalankan deteksi pose, pelacakan ID, dan pengukuran panjang ikan.
     </p>
   </div>
 </div>
