@@ -2,13 +2,10 @@
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>Goldfish AI Lab – YOLO Pose Analyzer</title>
+    <title>Goldfish AI Lab – Pose Analyzer</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
-    <!-- Google Font -->
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-
-    <!-- Style -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 
@@ -16,38 +13,40 @@
 
 <header class="header">
     <h1>Goldfish AI Lab</h1>
-    <p>Pose Detection · Size Estimation · Counting</p>
+    <p>Pose Detection · Length Estimation · Counting · Video/Gambar</p>
 </header>
 
 <main class="container">
 
-    <section class="upload-section">
-        <h2>Unggah Gambar Ikan</h2>
-        <p>Pilih gambar ikan mas untuk dideteksi pose (head–tail), hitung panjang, dan bounding box.</p>
+    <!-- ==== Upload ==== -->
+    <section class="card">
+        <h2>Unggah Gambar / Video</h2>
 
-        <input type="file" id="upload" accept="image/*">
-
-        <div id="status" class="status loading">
-            Memuat model dari Roboflow…
-        </div>
+        <input type="file" id="fileInput" accept="image/*,video/*">
+        <div id="status" class="status loading">Memuat model…</div>
     </section>
 
-    <section class="preview-section">
+    <!-- ==== Hasil ==== -->
+    <section class="card">
         <h2>Hasil Deteksi</h2>
 
-        <div class="canvas-wrapper">
-            <img id="input-image" style="display:none;">
-            <canvas id="output"></canvas>
+        <div id="preview-wrapper">
+            <img id="imgInput" style="display:none;">
+            <video id="videoInput" controls style="display:none;"></video>
+            <canvas id="canvasOutput"></canvas>
         </div>
 
-        <h3>Detail Prediksi</h3>
-        <pre id="log" class="log-box"></pre>
+        <h3>Ringkasan</h3>
+        <div id="summaryBox" class="summary-box"></div>
+
+        <h3>Log Hasil Deteksi</h3>
+        <pre id="logBox" class="log-box"></pre>
     </section>
 
 </main>
 
 <footer class="footer">
-    Goldfish AI Lab · YOLO Pose Detection · Powered by Roboflow
+    Goldfish AI Lab · YOLO Pose Analyzer · Roboflow
 </footer>
 
 <script src="https://cdn.roboflow.com/roboflow.js"></script>
