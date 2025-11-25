@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <title>Goldfish AI Lab – YOLO Pose Analyzer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+
+    <!-- Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Style -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+<header class="header">
+    <h1>Goldfish AI Lab</h1>
+    <p>Pose Detection · Size Estimation · Counting</p>
+</header>
+
+<main class="container">
+
+    <section class="upload-section">
+        <h2>Unggah Gambar Ikan</h2>
+        <p>Pilih gambar ikan mas untuk dideteksi pose (head–tail), hitung panjang, dan bounding box.</p>
+
+        <input type="file" id="upload" accept="image/*">
+
+        <div id="status" class="status loading">
+            Memuat model dari Roboflow…
+        </div>
+    </section>
+
+    <section class="preview-section">
+        <h2>Hasil Deteksi</h2>
+
+        <div class="canvas-wrapper">
+            <img id="input-image" style="display:none;">
+            <canvas id="output"></canvas>
+        </div>
+
+        <h3>Detail Prediksi</h3>
+        <pre id="log" class="log-box"></pre>
+    </section>
+
+</main>
+
+<footer class="footer">
+    Goldfish AI Lab · YOLO Pose Detection · Powered by Roboflow
+</footer>
+
+<script src="https://cdn.roboflow.com/roboflow.js"></script>
+<script src="app.js"></script>
+
+</body>
+</html>
