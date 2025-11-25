@@ -2,10 +2,10 @@ import cv2
 import os
 
 # Path video tunggal
-video_path = r"D:\goldfish-yolov8\videos\mas7.mp4"
+video_path = r"D:\goldfish-web\videos\mas11.mp4"
 
 # Folder output
-output_folder = r"D:\goldfish-yolov8\frame"
+output_folder = r"D:\goldfish-web\frame"
 os.makedirs(output_folder, exist_ok=True)
 
 frame_interval = 10

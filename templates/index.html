@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <title>Goldfish AI Lab – Image Pose Analyzer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+  <header class="header">
+    <h1>Goldfish AI Lab</h1>
+    <p>YOLO Pose · Estimasi Panjang & Jumlah Ikan · Mode Gambar</p>
+  </header>
+
+  <main class="container">
+
+    <!-- Upload -->
+    <section class="card">
+      <h2>Unggah Gambar</h2>
+      <form id="upload-form" class="upload-form">
+        <input type="file" id="image-input" name="image" accept="image/*" required />
+        <button type="submit" id="btn-submit" class="btn-primary">Analisis Gambar</button>
+      </form>
+      <div id="status" class="status hidden"></div>
+    </section>
+
+    <!-- Hasil -->
+    <section class="card">
+      <h2>Hasil Analisis</h2>
+
+      <div class="result-grid">
+        <div class="result-left">
+          <h3>Pratinjau & Anotasi</h3>
+          <div class="preview-wrapper">
+            <img id="preview-original" alt="Gambar asli" />
+            <img id="preview-annotated" alt="Gambar anotasi" />
+          </div>
+        </div>
+
+        <div class="result-right">
+          <h3>Ringkasan</h3>
+          <div id="summary-box" class="summary-box"></div>
+
+          <h3>Detail per Ikan</h3>
+          <table id="fish-table" class="fish-table">
+            <thead>
+              <tr>
+                <th>ID Ikan</th>
+                <th>Confidence</th>
+                <th>Panjang (cm)</th>
+              </tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+
+          <div class="download-block">
+            <a id="csv-link" href="#" class="btn-secondary" target="_blank">Unduh CSV Log</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="footer">
+    Goldfish AI Lab · Image Pose Analyzer · Flask + YOLO
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
