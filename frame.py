@@ -2,7 +2,7 @@ import cv2
 import os
 
 # Path video tunggal
-video_path = r"D:\goldfish-web\videos\mas11.mp4"
+video_path = r"D:\goldfish-web\videos\mas13.mp4"
 
 # Folder output
 output_folder = r"D:\goldfish-web\frame"
