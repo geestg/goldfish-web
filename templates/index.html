@@ -1,74 +1,47 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-  <meta charset="UTF-8" />
-  <title>Goldfish AI Lab – Image Pose Analyzer</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+{% extends "layout.html" %}
+{% block content %}
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-</head>
+<div class="card card-hero">
+  <div class="card-hero-text">
+    <h1>Goldfish Detection Dashboard</h1>
+    <p>
+      Platform analitik untuk mengukur panjang dan menghitung jumlah ikan mas
+      menggunakan model YOLOv8 Pose.
+    </p>
 
-<body>
-  <header class="header">
-    <h1>Goldfish AI Lab</h1>
-    <p>YOLO Pose · Estimasi Panjang & Jumlah Ikan · Mode Gambar</p>
-  </header>
+    <div class="hero-actions">
+      <a href="{{ url_for('page_image') }}" class="btn-primary">
+        Mulai dari Gambar
+      </a>
+      <a href="{{ url_for('page_video') }}" class="btn-secondary">
+        Mulai dari Video
+      </a>
+    </div>
+  </div>
 
-  <main class="container">
+  <div class="card-hero-badge">
+    <span>YOLOv8 Pose · Goldfish</span>
+  </div>
+</div>
 
-    <!-- Upload -->
-    <section class="card">
-      <h2>Unggah Gambar</h2>
-      <form id="upload-form" class="upload-form">
-        <input type="file" id="image-input" name="image" accept="image/*" required />
-        <button type="submit" id="btn-submit" class="btn-primary">Analisis Gambar</button>
-      </form>
-      <div id="status" class="status hidden"></div>
-    </section>
+<div class="welcome-grid">
+  <div class="info-card">
+    <h3>Analisis Gambar</h3>
+    <p>
+      Upload satu frame akuarium dari atas, sistem akan mendeteksi ikan,
+      menghitung jumlahnya, dan mengestimasi panjang setiap ikan.
+    </p>
+    <a href="{{ url_for('page_image') }}" class="link-inline">Buka halaman analisis gambar →</a>
+  </div>
 
-    <!-- Hasil -->
-    <section class="card">
-      <h2>Hasil Analisis</h2>
+  <div class="info-card">
+    <h3>Analisis Video</h3>
+    <p>
+      Unggah video pendek akuarium untuk melihat bagaimana ikan bergerak
+      dan bagaimana model membaca panjang ikan sepanjang waktu.
+    </p>
+    <a href="{{ url_for('page_video') }}" class="link-inline">Buka halaman analisis video →</a>
+  </div>
+</div>
 
-      <div class="result-grid">
-        <div class="result-left">
-          <h3>Pratinjau & Anotasi</h3>
-          <div class="preview-wrapper">
-            <img id="preview-original" alt="Gambar asli" />
-            <img id="preview-annotated" alt="Gambar anotasi" />
-          </div>
-        </div>
-
-        <div class="result-right">
-          <h3>Ringkasan</h3>
-          <div id="summary-box" class="summary-box"></div>
-
-          <h3>Detail per Ikan</h3>
-          <table id="fish-table" class="fish-table">
-            <thead>
-              <tr>
-                <th>ID Ikan</th>
-                <th>Confidence</th>
-                <th>Panjang (cm)</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-
-          <div class="download-block">
-            <a id="csv-link" href="#" class="btn-secondary" target="_blank">Unduh CSV Log</a>
-          </div>
-        </div>
-      </div>
-    </section>
-
-  </main>
-
-  <footer class="footer">
-    Goldfish AI Lab · Image Pose Analyzer · Flask + YOLO
-  </footer>
-
-  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
-</body>
-</html>
+{% endblock %}

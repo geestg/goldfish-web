@@ -1,0 +1,46 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="card">
+  <h2>Analisis Video</h2>
+  <p class="card-subtitle">
+    Unggah video akuarium (durasi pendek). Sistem akan menghasilkan video anotasi
+    serta ringkasan log deteksi ikan.
+  </p>
+
+  <form id="video-form" enctype="multipart/form-data" class="upload-form">
+    <input type="file" id="video-input" name="video" accept="video/*" required />
+    <button type="submit" id="btn-video" class="btn-secondary">
+      Analisis Video
+    </button>
+  </form>
+  <div id="video-status" class="status hidden"></div>
+</div>
+
+<div class="card">
+  <h2>Hasil Analisis Video</h2>
+
+  <div class="video-result-grid">
+    <div class="video-block">
+      <h3>Video Anotasi</h3>
+      <div class="video-preview-wrapper">
+        <video id="video-preview" controls></video>
+      </div>
+    </div>
+
+    <div class="video-info">
+      <h3>Ringkasan</h3>
+      <div id="video-summary" class="summary-box muted">
+        Belum ada analisis. Unggah video terlebih dahulu.
+      </div>
+
+      <div class="download-block">
+        <a id="video-csv" href="#" class="btn-outline" target="_blank">
+          Unduh CSV Video
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% endblock %}
