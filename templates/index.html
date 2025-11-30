@@ -1,46 +1,30 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="card card-hero">
-  <div class="card-hero-text">
-    <h1>Goldfish Detection Dashboard</h1>
-    <p>
-      Platform analitik untuk mengukur panjang dan menghitung jumlah ikan mas
-      menggunakan model YOLOv8 Pose.
-    </p>
-
-    <div class="hero-actions">
-      <a href="{{ url_for('page_image') }}" class="btn-primary">
-        Mulai dari Gambar
-      </a>
-      <a href="{{ url_for('page_video') }}" class="btn-secondary">
-        Mulai dari Video
-      </a>
-    </div>
-  </div>
-
-  <div class="card-hero-badge">
-    <span>YOLOv8 Pose · Goldfish</span>
-  </div>
+<div class="section-card">
+  <h2>Selamat Datang di Goldfish AI Lab</h2>
+  <p>Sistem analisis ikan berbasis YOLOv8-Pose untuk:</p>
+  <ul style="margin: 10px 0 0 18px; color: var(--text-muted);">
+    <li>Deteksi jumlah ikan</li>
+    <li>Perhitungan panjang tubuh (head → tail)</li>
+    <li>Visualisasi anotasi gambar & video</li>
+    <li>Ekspor data ke CSV</li>
+  </ul>
 </div>
 
-<div class="welcome-grid">
-  <div class="info-card">
-    <h3>Analisis Gambar</h3>
-    <p>
-      Upload satu frame akuarium dari atas, sistem akan mendeteksi ikan,
-      menghitung jumlahnya, dan mengestimasi panjang setiap ikan.
-    </p>
-    <a href="{{ url_for('page_image') }}" class="link-inline">Buka halaman analisis gambar →</a>
-  </div>
+<div class="section-card">
+  <h2>Mulai Analisis</h2>
 
-  <div class="info-card">
-    <h3>Analisis Video</h3>
-    <p>
-      Unggah video pendek akuarium untuk melihat bagaimana ikan bergerak
-      dan bagaimana model membaca panjang ikan sepanjang waktu.
-    </p>
-    <a href="{{ url_for('page_video') }}" class="link-inline">Buka halaman analisis video →</a>
+  <div style="margin-top: 12px;">
+    <a href="{{ url_for('page_image') }}" class="menu-item" 
+       style="display:inline-block; background:var(--primary); color:#fff; padding:10px 20px; border-radius:12px;">
+      🔍 Analisis Gambar
+    </a>
+
+    <a href="{{ url_for('page_video') }}" class="menu-item"
+       style="display:inline-block; margin-left:10px; background:#22c55e; color:#fff; padding:10px 20px; border-radius:12px;">
+      🎞️ Analisis Video
+    </a>
   </div>
 </div>
 

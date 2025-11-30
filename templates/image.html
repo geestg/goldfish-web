@@ -1,65 +1,50 @@
 {% extends "layout.html" %}
 {% block content %}
 
-<div class="card">
+<div class="section-card">
   <h2>Analisis Gambar</h2>
-  <p class="card-subtitle">
-    Unggah satu gambar akuarium dari atas. Sistem akan mendeteksi ikan, menghitung
-    jumlahnya, dan mengestimasi panjang tiap ikan.
-  </p>
+  <p>Unggah gambar ikan untuk mendeteksi jumlah dan mengukur panjang.</p>
 
-  <form id="image-form" class="upload-form" enctype="multipart/form-data">
-    <input type="file" id="image-input" name="image" accept="image/*" required />
-    <button type="submit" id="btn-image" class="btn-primary">
-      Analisis Gambar
-    </button>
+  <form id="image-form" style="margin-top:10px;">
+    <input type="file" id="image-input" name="image">
+    <button id="btn-image">Proses Gambar</button>
+    <div id="image-status" class="status-box hidden"></div>
   </form>
-
-  <div id="image-status" class="status hidden"></div>
 </div>
 
-<div class="card">
-  <h2>Hasil Analisis Gambar</h2>
+<!-- RINGKASAN -->
+<div class="summary-grid">
+  <div class="summary-box" id="summary-box">
+    <p><strong>Belum ada data.</strong></p>
+  </div>
 
-  <div class="result-grid">
-    <div class="result-left">
-      <h3>Pratinjau</h3>
-      <div class="preview-wrapper">
-        <div class="preview-block">
-          <span class="preview-label">Gambar Asli</span>
-          <img id="preview-original" alt="">
-        </div>
-        <div class="preview-block">
-          <span class="preview-label">Hasil Anotasi</span>
-          <img id="preview-annotated" alt="">
-        </div>
-      </div>
-    </div>
+  <div class="result-table">
+    <h3>Tabel Hasil</h3>
+    <table id="fish-table">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Confidence</th>
+          <th>Panjang (cm)</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
 
-    <div class="result-right">
-      <h3>Ringkasan</h3>
-      <div id="summary-box" class="summary-box muted">
-        Belum ada analisis. Unggah gambar terlebih dahulu.
-      </div>
+    <a id="csv-link" class="btn-download" href="#">Download CSV</a>
+  </div>
+</div>
 
-      <h3>Detail per Ikan</h3>
-      <table id="fish-table" class="fish-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Confidence</th>
-            <th>Panjang (cm)</th>
-          </tr>
-        </thead>
-        <tbody></tbody>
-      </table>
+<!-- PREVIEW -->
+<div class="preview-grid">
+  <div>
+    <h3>Gambar Asli</h3>
+    <img id="preview-original" class="preview-img">
+  </div>
 
-      <div class="download-block">
-        <a id="csv-link" href="#" class="btn-outline" target="_blank">
-          Unduh CSV
-        </a>
-      </div>
-    </div>
+  <div>
+    <h3>Hasil Anotasi</h3>
+    <img id="preview-annotated" class="preview-img">
   </div>
 </div>
 

@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8" />
+  <meta charset="UTF-8">
   <title>{{ title or "Goldfish AI Lab" }}</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
-        rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 
@@ -15,38 +14,34 @@
 
     <!-- SIDEBAR -->
     <aside class="sidebar">
+
       <div class="sidebar-brand">
-        <span class="brand-logo">GF</span>
-        <div class="brand-text-group">
-          <span class="brand-text-main">Goldfish AI Lab</span>
-          <span class="brand-text-sub">YOLOv8 Pose Dashboard</span>
+        <div class="brand-logo">GF</div>
+        <div>
+          <div class="brand-text-main">Goldfish AI Lab</div>
+          <div class="brand-text-sub">YOLOv8-Pose Dashboard</div>
         </div>
       </div>
 
-      <nav class="sidebar-menu">
-        <div class="menu-section">NAVIGASI</div>
+      <div class="sidebar-section-title">NAVIGASI</div>
 
-        <a href="{{ url_for('index') }}"
-           class="menu-item {% if active == 'home' %}active{% endif %}">
-          <span class="menu-icon">🏠</span>
-          <span>Dashboard</span>
-        </a>
+      <a href="{{ url_for('index') }}" 
+         class="menu-item {% if active == 'home' %}active{% endif %}">
+        🏠 Dashboard
+      </a>
 
-        <a href="{{ url_for('page_image') }}"
-           class="menu-item {% if active == 'image' %}active{% endif %}">
-          <span class="menu-icon">🐟</span>
-          <span>Analisis Gambar</span>
-        </a>
+      <a href="{{ url_for('page_image') }}" 
+         class="menu-item {% if active == 'image' %}active{% endif %}">
+        🐟 Analisis Gambar
+      </a>
 
-        <a href="{{ url_for('page_video') }}"
-           class="menu-item {% if active == 'video' %}active{% endif %}">
-          <span class="menu-icon">🎞️</span>
-          <span>Analisis Video</span>
-        </a>
-      </nav>
+      <a href="{{ url_for('page_video') }}"
+         class="menu-item {% if active == 'video' %}active{% endif %}">
+        🎞️ Analisis Video
+      </a>
 
       <div class="sidebar-footer">
-        <div class="user-info">
+        <div class="user-box">
           <div class="avatar">G</div>
           <div>
             <div class="user-name">Admin</div>
@@ -59,19 +54,18 @@
     <!-- MAIN -->
     <main class="main">
       <header class="topbar">
-        <div class="topbar-left">
-          <div class="topbar-title">{{ title or "Goldfish AI Lab" }}</div>
-          <div class="topbar-subtitle">{{ subtitle or "" }}</div>
+        <div>
+          <div class="topbar-title">Goldfish AI Lab</div>
+          <div class="topbar-subtitle">Production Preview</div>
         </div>
-        <div class="topbar-right">
-          <span class="topbar-pill">Production Preview</span>
-        </div>
+        <div class="topbar-badge">Stable Build</div>
       </header>
 
       <div class="page-container">
         {% block content %}{% endblock %}
       </div>
     </main>
+
   </div>
 
   <script src="{{ url_for('static', filename='js/app.js') }}"></script>
