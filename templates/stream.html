@@ -1,0 +1,45 @@
+{% extends "layout.html" %}
+{% block content %}
+
+<div class="section-card">
+  <h2>Streaming iPhone (Realtime YOLOv8-Pose)</h2>
+  <p>Menampilkan video realtime dari iPhone</p>
+
+  <!-- STREAM VIEW -->
+  <div style="margin-top: 16px;">
+    <img id="stream-video"
+         src="{{ url_for('stream_live') }}"
+         class="video-show"
+         style="max-width: 640px; width: 100%; border-radius: 14px; border: 1px solid var(--border); background:#000;">
+  </div>
+
+  <!-- BUTTONS -->
+  <div style="margin-top: 18px; display: flex; gap: 10px;">
+
+    <button id="btn-stream-capture"
+            style="padding: 10px 18px; border-radius: 12px; background:#2563eb; color:white; border:none; cursor:pointer;">
+      📸 Snapshot
+    </button>
+
+    <button id="btn-stream-rec-start"
+            style="padding: 10px 18px; border-radius: 12px; background:#22c55e; color:white; border:none; cursor:pointer;">
+      ⏺ Mulai Rekam
+    </button>
+
+    <button id="btn-stream-rec-stop"
+            style="padding: 10px 18px; border-radius: 12px; background:#ef4444; color:white; border:none; cursor:pointer;">
+      ⏹ Stop Rekam
+    </button>
+
+  </div>
+
+  <!-- STATUS TEXT -->
+  <div id="stream-status"
+       class="status-box"
+       style="margin-top: 14px; padding: 10px; background:#f1f5f9; border-radius: 8px; border:1px solid var(--border); font-size: 14px;">
+    Status: Menunggu aktivitas...
+  </div>
+
+</div>
+
+{% endblock %}

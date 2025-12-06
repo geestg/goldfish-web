@@ -123,3 +123,60 @@ if (videoForm) {
     setStatus(videoStatus, "Analisis Video selesai.", "info");
   });
 }
+
+/* ============================================================
+   STREAMING LARIX + YOLO (REALTIME)
+============================================================ */
+
+const streamImg = document.getElementById("stream-video");
+const streamStatus = document.getElementById("stream-status");
+const btnStreamCapture = document.getElementById("btn-stream-capture");
+const btnStreamRecStart = document.getElementById("btn-stream-rec-start");
+const btnStreamRecStop = document.getElementById("btn-stream-rec-stop");
+
+if (streamImg) {
+
+  // Capture snapshot
+  btnStreamCapture.addEventListener("click", async () => {
+    setStatus(streamStatus, "Menyimpan snapshot...", "info");
+
+    const resp = await fetch("/stream/capture", { method: "POST" });
+    const data = await resp.json();
+
+    if (data.status !== "ok") {
+      setStatus(streamStatus, data.message || "Gagal capture.", "error");
+      return;
+    }
+
+    setStatus(streamStatus, "Snapshot disimpan: " + data.file, "info");
+  });
+
+  // Mulai rekam
+  btnStreamRecStart.addEventListener("click", async () => {
+    setStatus(streamStatus, "Mengaktifkan perekaman...", "info");
+
+    const resp = await fetch("/stream/record-start", { method: "POST" });
+    const data = await resp.json();
+
+    if (data.status === "error") {
+      setStatus(streamStatus, data.message, "error");
+    } else if (data.status === "already_recording") {
+      setStatus(streamStatus, "Sedang merekam.", "info");
+    } else {
+      setStatus(streamStatus, "Rekaman dimulai: " + data.file, "info");
+    }
+  });
+
+  // Stop rekam
+  btnStreamRecStop.addEventListener("click", async () => {
+    const resp = await fetch("/stream/record-stop", { method: "POST" });
+    const data = await resp.json();
+
+    if (data.status === "ok") {
+      setStatus(streamStatus, "Rekaman dihentikan.", "info");
+    } else {
+      setStatus(streamStatus, "Tidak ada rekaman aktif.", "error");
+    }
+  });
+
+}

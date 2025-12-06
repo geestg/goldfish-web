@@ -1,12 +1,12 @@
-import os                     # Modul untuk operasi sistem dan manajemen path
-import re                     # Modul untuk regular expression (digunakan untuk parsing header Range)
-import uuid                   # Modul pembangkit unique ID
-from datetime import datetime # Mengambil waktu aktual untuk memberi timestamp pada output
+import os
+import re
+import uuid
+from datetime import datetime
 
-import cv2                    # OpenCV untuk pemrosesan gambar/video
-import numpy as np            # NumPy untuk operasi numerik
-import pandas as pd           # Pandas untuk menyimpan log ke CSV
-from flask import (           # Flask untuk membuat backend web server
+import cv2
+import numpy as np
+import pandas as pd
+from flask import (
     Flask,
     render_template,
     request,
@@ -14,126 +14,112 @@ from flask import (           # Flask untuk membuat backend web server
     Response,
     send_file,
 )
-from ultralytics import YOLO  # Model YOLO untuk deteksi pose ikan
+from ultralytics import YOLO
 
 
 # ============================================================
 # KONFIGURASI DASAR
 # ============================================================
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))  
-# Menentukan direktori utama proyek (path file ini berada)
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
-UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")          
-# Folder untuk menyimpan file upload pengguna
+UPLOAD_DIR = os.path.join(BASE_DIR, "uploads")
+WEB_OUTPUT_IMAGE = os.path.join(BASE_DIR, "analisa_gambar")
+WEB_OUTPUT_VIDEO = os.path.join(BASE_DIR, "analisa_video")
+MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")
 
-WEB_OUTPUT_IMAGE = os.path.join(BASE_DIR, "analisa_gambar")  
-# Folder untuk hasil analisis gambar (annotated)
+# FOLDER STREAMING SESUAI PERMINTAAN ANDA
+STREAM_SNAPSHOT_DIR = r"D:\goldfish-web\snapshot"
+STREAM_VIDEO_DIR = r"D:\goldfish-web\video_stream"
 
-WEB_OUTPUT_VIDEO = os.path.join(BASE_DIR, "analisa_video")    
-# Folder untuk hasil analisis video (annotated)
+# DroidCam MJPEG URL
+RTSP_URL = "http://10.132.113.136:4747/video"
 
-MODEL_PATH = os.path.join(BASE_DIR, "models", "best.pt")      
-# Path model YOLO yang digunakan untuk inferensi
-
-# Membuat folder jika belum ada
+# Buat folder jika belum ada
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(WEB_OUTPUT_IMAGE, exist_ok=True)
 os.makedirs(WEB_OUTPUT_VIDEO, exist_ok=True)
+os.makedirs(STREAM_SNAPSHOT_DIR, exist_ok=True)
+os.makedirs(STREAM_VIDEO_DIR, exist_ok=True)
 
-PX_PER_CM = 25.0  
-# Nilai konversi piksel ke sentimeter (hasil kalibrasi kamera)
+PX_PER_CM = 25.0
 
 
 # ============================================================
-# INISIALISASI FLASK + LOAD MODEL
+# INISIALISASI FLASK + MODEL
 # ============================================================
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
-# Membuat aplikasi Flask dan menentukan folder static dan templates
 
-print(f"[INFO] Model Loaded: {MODEL_PATH}")  
-model = YOLO(MODEL_PATH)     
-# Load model YOLO sekali pada startup aplikasi (lebih efisien)
+print(f"[INFO] Model Loaded: {MODEL_PATH}")
+model = YOLO(MODEL_PATH)
 
 
-def run_id():
-    """Membuat ID unik untuk setiap analisis."""
+def run_id() -> str:
     return datetime.now().strftime("%Y%m%d-%H%M%S") + "-" + uuid.uuid4().hex[:5]
 
 
 # ============================================================
-# FUNGSI UNTUK MENGGAMBAR ANOTASI
+# UTILITAS (TIDAK DIUBAH)
 # ============================================================
 
-def draw_annotations(img, box, head, tail, length_cm):
-    # Menguraikan koordinat bounding box
+def draw_annotations(img, box, head, tail, length_cm: float):
     x1, y1, x2, y2 = map(int, box)
-
-    # Menggambar bounding box kuning
     cv2.rectangle(img, (x1, y1), (x2, y2), (0, 255, 255), 2)
-
-    # Menandai titik head (merah)
     cv2.circle(img, (int(head[0]), int(head[1])), 6, (0, 0, 255), -1)
-
-    # Menandai titik tail (hijau)
     cv2.circle(img, (int(tail[0]), int(tail[1])), 6, (0, 255, 0), -1)
-
-    # Menghubungkan head dan tail dengan garis hijau
-    cv2.line(img, (int(head[0]), int(head[1])), (int(tail[0]), int(tail[1])),
-             (0, 255, 0), 3)
-
-    # Menulis label panjang ikan
+    cv2.line(img, (int(head[0]), int(head[1])),
+             (int(tail[0]), int(tail[1])), (0, 255, 0), 3)
     label = f"{length_cm:.2f} cm"
     cv2.putText(img, label, (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX, 0.7,
-                (0, 255, 255), 2)
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
 
 
 # ============================================================
-# ANALISIS GAMBAR
+# ANALISIS GAMBAR (TIDAK DIUBAH)
 # ============================================================
 
 def analyze_image(img_path):
-    rid = run_id()            # ID unik untuk sesi analisis
-    img = cv2.imread(img_path)  # Membaca gambar asli
-    res = model(img)[0]         # Melakukan inferensi YOLO
+    rid = run_id()
+    img = cv2.imread(img_path)
+    res = model(img)[0]
 
-    annotated = img.copy()      # Menyalin gambar asli untuk diberi anotasi
-    records = []                # List penyimpanan log hasil deteksi
+    annotated = img.copy()
+    records = []
 
-    if res.keypoints is not None:        # Jika model mendeteksi pose
-        kpts = res.keypoints.xy.cpu().numpy()  # Mengambil keypoints ke numpy
-        boxes = res.boxes.xyxy.cpu().numpy()   # Mengambil bounding box
-        confs = res.boxes.conf.cpu().numpy()   # Mengambil nilai confidence
+    if res.keypoints is not None:
+        kpts = res.keypoints.xy.cpu().numpy()
+        boxes = res.boxes.xyxy.cpu().numpy()
+        confs = res.boxes.conf.cpu().numpy()
 
-        for i in range(len(kpts)):        # Iterasi tiap ikan
-            head = kpts[i, 0]             # Keypoint kepala
-            tail = kpts[i, 1]             # Keypoint ekor
+        for i in range(len(kpts)):
+            head = kpts[i, 0]
+            tail = kpts[i, 1]
 
-            px = float(np.linalg.norm(head - tail))  # Jarak piksel
-            cm = px / PX_PER_CM                        # Konversi ke cm
+            length_px = float(np.linalg.norm(head - tail))
+            length_cm = length_px / PX_PER_CM
 
-            draw_annotations(annotated, boxes[i], head, tail, cm)
+            draw_annotations(annotated, boxes[i], head, tail, length_cm)
 
-            records.append({
-                "run_id": rid,
-                "fish_id": i + 1,
-                "confidence": float(confs[i]),
-                "length_px": px,
-                "length_cm": cm
-            })
+            records.append(
+                {
+                    "run_id": rid,
+                    "fish_id": i + 1,
+                    "confidence": float(confs[i]),
+                    "length_px": length_px,
+                    "length_cm": length_cm,
+                }
+            )
 
-    # Penomoran file output
     idx = len(os.listdir(WEB_OUTPUT_IMAGE)) + 1
     img_name = f"IMG_ANALYSIS_{idx:04d}.png"
     csv_name = f"IMG_ANALYSIS_{idx:04d}.csv"
 
-    # Menyimpan hasil anotasi dan CSV
     cv2.imwrite(os.path.join(WEB_OUTPUT_IMAGE, img_name), annotated)
-    pd.DataFrame(records).to_csv(os.path.join(WEB_OUTPUT_IMAGE, csv_name), index=False)
+    pd.DataFrame(records).to_csv(
+        os.path.join(WEB_OUTPUT_IMAGE, csv_name), index=False
+    )
 
-    # Ringkasan analisis
     summary = {
         "run_id": rid,
         "num_fish": len(records),
@@ -145,18 +131,17 @@ def analyze_image(img_path):
 
 
 # ============================================================
-# ANALISIS VIDEO
+# ANALISIS VIDEO (TIDAK DIUBAH)
 # ============================================================
 
 def analyze_video(video_path):
-    rid = run_id()            # ID untuk analisis video
+    rid = run_id()
 
-    cap = cv2.VideoCapture(video_path)   # Membuka video
-    fps = cap.get(cv2.CAP_PROP_FPS) or 15  # Ambil FPS
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 15
     w = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     h = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 
-    # Penomoran output
     idx = len(os.listdir(WEB_OUTPUT_VIDEO)) + 1
     out_video = f"VID_ANALYSIS_{idx:04d}.mp4"
     out_csv = f"VID_ANALYSIS_{idx:04d}.csv"
@@ -164,20 +149,19 @@ def analyze_video(video_path):
     out_vpath = os.path.join(WEB_OUTPUT_VIDEO, out_video)
     csv_path = os.path.join(WEB_OUTPUT_VIDEO, out_csv)
 
-    # Menulis video output (format H.264)
     fourcc = cv2.VideoWriter_fourcc(*"avc1")
     writer = cv2.VideoWriter(out_vpath, fourcc, fps, (w, h))
 
-    logs = []         # Log pengukuran tiap frame
-    frame_idx = 0     # Penanda frame
+    logs = []
+    frame_idx = 0
 
-    while True:                       # Loop membaca frame
+    while True:
         ok, frame = cap.read()
         if not ok:
-            break                     # Keluar jika video selesai
+            break
 
-        res = model(frame)[0]         # Deteksi YOLO
-        annotated = frame.copy()      # Salin frame untuk anotasi
+        res = model(frame)[0]
+        annotated = frame.copy()
 
         if res.keypoints is not None:
             kpts = res.keypoints.xy.cpu().numpy()
@@ -187,19 +171,21 @@ def analyze_video(video_path):
                 head = kpts[i, 0]
                 tail = kpts[i, 1]
 
-                px = float(np.linalg.norm(head - tail))
-                cm = px / PX_PER_CM
+                length_px = float(np.linalg.norm(head - tail))
+                length_cm = length_px / PX_PER_CM
 
-                draw_annotations(annotated, boxes[i], head, tail, cm)
+                draw_annotations(annotated, boxes[i], head, tail, length_cm)
 
-                logs.append({
-                    "frame": frame_idx,
-                    "fish_id": i + 1,
-                    "length_cm": cm
-                })
+                logs.append(
+                    {
+                        "frame": frame_idx,
+                        "fish_id": i + 1,
+                        "length_cm": length_cm,
+                    }
+                )
 
-        writer.write(annotated)       # Menyimpan frame anotasi
-        frame_idx += 1                # Increment frame index
+        writer.write(annotated)
+        frame_idx += 1
 
     cap.release()
     writer.release()
@@ -210,65 +196,145 @@ def analyze_video(video_path):
 
 
 # ============================================================
-# ROUTE FILE ANALISIS GAMBAR & VIDEO
+# STREAMING REALTIME (TANPA YOLO)
+# ============================================================
+
+recording = False
+stream_writer = None
+last_frame = None
+
+
+def yolo_stream_generator():
+    """Streaming realtime TANPA YOLO."""
+    global recording, stream_writer, last_frame
+
+    cap = cv2.VideoCapture(RTSP_URL)
+
+    if not cap.isOpened():
+        print("[WARN] Tidak dapat membuka stream.")
+        while True:
+            blank = np.zeros((480, 640, 3), dtype=np.uint8)
+            _, buffer = cv2.imencode(".jpg", blank)
+            yield (
+                b"--frame\r\n"
+                b"Content-Type: image/jpeg\r\n\r\n" +
+                buffer.tobytes() + b"\r\n"
+            )
+
+    while True:
+        ok, frame = cap.read()
+        if not ok:
+            continue
+
+        last_frame = frame.copy()
+
+        if recording and stream_writer is not None:
+            stream_writer.write(frame)
+
+        _, buffer = cv2.imencode(".jpg", frame)
+
+        yield (
+            b"--frame\r\n"
+            b"Content-Type: image/jpeg\r\n\r\n" +
+            buffer.tobytes() + b"\r\n"
+        )
+
+
+# ============================================================
+# ROUTE STREAMING
+# ============================================================
+
+@app.route("/stream/live")
+def stream_live():
+    return Response(
+        yolo_stream_generator(),
+        mimetype="multipart/x-mixed-replace; boundary=frame",
+    )
+
+
+@app.route("/stream/capture", methods=["POST"])
+def stream_capture():
+    global last_frame
+
+    if last_frame is None:
+        return jsonify({"status": "error", "message": "Belum ada frame stream."}), 400
+
+    filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_snapshot.jpg"
+    save_path = os.path.join(STREAM_SNAPSHOT_DIR, filename)
+
+    cv2.imwrite(save_path, last_frame)
+
+    return jsonify({
+        "status": "ok",
+        "file": filename,
+        "path": save_path
+    })
+
+
+@app.route("/stream/record-start", methods=["POST"])
+def stream_record_start():
+    global recording, stream_writer, last_frame
+
+    if recording:
+        return jsonify({"status": "already_recording"})
+
+    if last_frame is None:
+        return jsonify({
+            "status": "error",
+            "message": "Belum ada frame stream. Buka halaman streaming dulu."
+        }), 400
+
+    h, w = last_frame.shape[:2]
+    filename = datetime.now().strftime("%Y%m%d-%H%M%S") + "_stream.mp4"
+    save_path = os.path.join(STREAM_VIDEO_DIR, filename)
+
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    stream_writer = cv2.VideoWriter(save_path, fourcc, 20.0, (w, h))
+
+    recording = True
+
+    return jsonify({"status": "ok", "file": filename, "path": save_path})
+
+
+@app.route("/stream/record-stop", methods=["POST"])
+def stream_record_stop():
+    global recording, stream_writer
+
+    if not recording:
+        return jsonify({"status": "not_recording"})
+
+    recording = False
+
+    if stream_writer is not None:
+        stream_writer.release()
+        stream_writer = None
+
+    return jsonify({"status": "ok"})
+
+
+# ============================================================
+# ROUTE UNTUK FILE ANOTASI (WAJIB ADA)
 # ============================================================
 
 @app.route("/analisa_gambar/<path:filename>")
 def serve_analysis_image(filename):
-    # Mengirim file gambar hasil analisis
     return send_file(os.path.join(WEB_OUTPUT_IMAGE, filename))
-
 
 @app.route("/analisa_gambar/csv/<path:filename>")
 def serve_analysis_image_csv(filename):
-    # Mengirim file CSV analisis gambar
     return send_file(os.path.join(WEB_OUTPUT_IMAGE, filename))
 
+@app.route("/analisa_video/<path:filename>")
+def serve_analysis_video(filename):
+    return send_file(os.path.join(WEB_OUTPUT_VIDEO, filename))
 
 @app.route("/analisa_video/csv/<path:filename>")
 def serve_analysis_video_csv(filename):
-    # Mengirim file CSV analisis video
     return send_file(os.path.join(WEB_OUTPUT_VIDEO, filename))
 
 
 # ============================================================
-# STREAMING VIDEO (SUPPORT RANGE REQUEST)
-# ============================================================
-
-@app.route("/analisa_video/<path:filename>")
-def stream_video(filename):
-    file_path = os.path.join(WEB_OUTPUT_VIDEO, filename)
-
-    if not os.path.exists(file_path):
-        return "Not Found", 404
-
-    file_size = os.path.getsize(file_path)
-    range_header = request.headers.get("Range")
-
-    # Jika browser meminta sebagian video (Range)
-    if range_header:
-        match = re.search(r"bytes=(\d+)-(\d*)", range_header)
-        start = int(match.group(1))
-        end = match.group(2)
-        end = int(end) if end else file_size - 1
-
-        chunk = end - start + 1
-
-        with open(file_path, "rb") as f:
-            f.seek(start)
-            data = f.read(chunk)
-
-        resp = Response(data, 206, mimetype="video/mp4")
-        resp.headers["Content-Range"] = f"bytes {start}-{end}/{file_size}"
-        resp.headers["Accept-Ranges"] = "bytes"
-        resp.headers["Content-Length"] = str(chunk)
-        return resp
-
-    return send_file(file_path, mimetype="video/mp4")
-
-
-# ============================================================
-# HALAMAN WEB
+# ROUTE HALAMAN WEB
 # ============================================================
 
 @app.route("/")
@@ -286,15 +352,20 @@ def page_video():
     return render_template("video.html", active="video")
 
 
+@app.route("/streaming")
+def page_streaming():
+    return render_template("stream.html", active="stream")
+
+
 # ============================================================
-# API ENDPOINT UNTUK ANALISIS
+# API UPLOAD
 # ============================================================
 
 @app.route("/api/analyze-image", methods=["POST"])
 def api_image():
-    f = request.files["image"]     # Mengambil file dari request
+    f = request.files["image"]
     saved = os.path.join(UPLOAD_DIR, f.filename)
-    f.save(saved)                  # Menyimpan file upload
+    f.save(saved)
 
     img_name, csv_name, summary, records = analyze_image(saved)
 
@@ -321,14 +392,13 @@ def api_video():
         "video_url": f"/analisa_video/{video_name}",
         "csv_url": f"/analisa_video/{csv_name}",
         "total_logs": total_logs,
-        "records": logs
+        "records": logs,
     })
 
 
 # ============================================================
-# ENTRY POINT SERVER
+# MAIN ENTRY
 # ============================================================
 
 if __name__ == "__main__":
-    # Menjalankan Flask pada host 0.0.0.0 (agar bisa diakses jaringan lain)
     app.run(debug=True, host="0.0.0.0", port=8000)
